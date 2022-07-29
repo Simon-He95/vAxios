@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { AxiosRequestConfig, AxiosInstance } from 'axios'
+import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 import type { VAxiosConfig } from './types'
 
 export function vAxios(options: VAxiosConfig): AxiosInstance {
