@@ -1,8 +1,18 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig } from 'axios'
-import type { VAxiosConfig } from './types'
+import type { Merge } from './types'
+export interface VAxiosConfig {
+  interceptors?: Interceptors
+}
 
-export function vAxios(options: VAxiosConfig): AxiosInstance {
+interface Interceptors {
+  request?: (data: any) => any
+  requestError?: (error: any) => Promise<any>
+  response?: (data: any) => any
+  responseError?: (error: any) => Promise<any>
+}
+
+export function vAxios(options: Merge<VAxiosConfig, AxiosRequestConfig>): AxiosInstance {
   const service = axios.create(options)
   const {
     request,
