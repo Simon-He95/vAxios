@@ -15,6 +15,8 @@ This article is an additional vAxios documentation for [simon-js-tool] (https://
 
 ## vAxios
 - Axios-based packaging
+- Duplicate requests are automatically canceled
+- All requests can be made in the post(url, data, config) mode like post requests
 ```js
 const axios = vAxios({
   baseURL: 'http://localhost:3000',

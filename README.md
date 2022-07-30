@@ -16,6 +16,8 @@
 
 ## vAxios
 - 基于axios的封装
+- 重复的请求会被自动取消
+- 所有的请求都可以像post请求一样使用post(url, data, config)方式
 ```js
 const axios = vAxios({
   baseURL: 'http://localhost:3000',
