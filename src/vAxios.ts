@@ -47,7 +47,7 @@ export function vAxios(options: Merge<VAxiosConfig, AxiosRequestConfig>): Merge<
   service.get = function (url: string, params?: Record<string, any>, config: AxiosRequestConfig<any> = {}) {
     const key = generateKey({ url, method: 'get', params })
     return Get.call(service, url, {
-      cancelToken: new CancelToken(c => cancelMap.has(key) ? c('重复的请求') : cancelMap.set(key, c)),
+      cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
       params,
       ...config,
     })
@@ -57,7 +57,7 @@ export function vAxios(options: Merge<VAxiosConfig, AxiosRequestConfig>): Merge<
   service.post = function (url: string, data?: Record<string, any>, config: AxiosRequestConfig<any> = {}) {
     const key = generateKey({ url, method: 'post', data })
     return Post.call(service, url, data, {
-      cancelToken: new CancelToken(c => cancelMap.has(key) ? c('重复的请求') : cancelMap.set(key, c)),
+      cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
       ...config,
     })
   } as typeof axios.post
@@ -66,7 +66,7 @@ export function vAxios(options: Merge<VAxiosConfig, AxiosRequestConfig>): Merge<
   service.put = function (url: string, data?: Record<string, any>, config: AxiosRequestConfig<any> = {}) {
     const key = generateKey({ url, method: 'post', data })
     return Put.call(service, url, data, {
-      cancelToken: new CancelToken(c => cancelMap.has(key) ? c('重复的请求') : cancelMap.set(key, c)),
+      cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
       ...config,
     })
   } as typeof axios.put
@@ -75,13 +75,19 @@ export function vAxios(options: Merge<VAxiosConfig, AxiosRequestConfig>): Merge<
   service.delete = function (url: string, params?: Record<string, any>, config: AxiosRequestConfig<any> = {}) {
     const key = generateKey({ url, method: 'get', params })
     return Delete.call(service, url, {
-      cancelToken: new CancelToken(c => cancelMap.has(key) ? c('重复的请求') : cancelMap.set(key, c)),
+      cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
       params,
       ...config,
     })
   } as typeof axios.delete
 
   return service
+
+  function cancelInterceptor(key: string, c: Canceler) {
+    if (cancelMap.has(key))
+      cancelMap.get(key)?.('取消上一个重复的请求')
+    cancelMap.set(key, c)
+  }
 }
 
 function generateKey(config: AxiosRequestConfig) {
