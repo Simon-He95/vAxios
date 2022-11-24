@@ -47,51 +47,47 @@ export function vAxios(options?: Merge<VAxiosConfig, AxiosRequestConfig>): Merge
   const Get = service.get
   service.get = function (url: string, params: Record<string, any> = {}, config: Merge<AxiosRequestConfig<any>, { retry?: number }> = {}) {
     const key = generateKey({ url, method: 'get', params })
-    const count = 0
     const { retry = 0 } = config
     const call = () => Get.call(service, url, {
       cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
       params,
       ...config,
     })
-    return promiseCall(call, retry, count)
+    return promiseCall(call, retry)
   } as typeof axios.get
 
   const Post = service.post
   service.post = function (url: string, data: Record<string, any> = {}, config: Merge<AxiosRequestConfig<any>, { retry?: number }> = {}) {
     const key = generateKey({ url, method: 'post', data })
-    const count = 0
     const { retry = 0 } = config
     const call = () => Post.call(service, url, data, {
       cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
       ...config,
     })
-    return promiseCall(call, retry, count)
+    return promiseCall(call, retry)
   } as typeof axios.post
 
   const Put = service.put
   service.put = function (url: string, data: Record<string, any> = {}, config: Merge<AxiosRequestConfig<any>, { retry?: number }> = {}) {
     const key = generateKey({ url, method: 'post', data })
-    const count = 0
     const { retry = 0 } = config
     const call = () => Put.call(service, url, data, {
       cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
       ...config,
     })
-    return promiseCall(call, retry, count)
+    return promiseCall(call, retry)
   } as typeof axios.put
 
   const Delete = service.delete
   service.delete = function (url: string, params: Record<string, any> = {}, config: Merge<AxiosRequestConfig<any>, { retry?: number }> = {}) {
     const key = generateKey({ url, method: 'get', params })
-    const count = 0
     const { retry = 0 } = config
     const call = () => Delete.call(service, url, {
       cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
       params,
       ...config,
     })
-    return promiseCall(call, retry, count)
+    return promiseCall(call, retry)
   } as typeof axios.delete
 
   return service
@@ -108,14 +104,16 @@ function generateKey(config: AxiosRequestConfig) {
   return `${url}-${method}-${JSON.stringify(method === 'get' ? params : data)}`
 }
 
-function promiseCall(call: () => Promise<any>, retry: number, count: number) {
-  return new Promise((resolve, reject) => {
+function promiseCall(call: () => Promise<any>, retry: number, count = 0, resolve?: any, reject?: any) {
+  return new Promise((_resolve, _reject) => {
+    resolve = resolve || _resolve
+    reject = reject || _reject
     const p = call()
     p.then(resolve)
     p.catch((err) => {
       if (count < retry) {
         count++
-        promiseCall(call, retry, count)
+        promiseCall(call, retry, count, resolve, reject)
       }
       else {
         reject(err)
