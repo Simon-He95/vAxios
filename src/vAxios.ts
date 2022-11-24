@@ -3,6 +3,7 @@ import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, Canceler } from 
 import type { Merge } from './types'
 export interface VAxiosConfig {
   interceptors?: Interceptors
+  retry?: number
 }
 
 interface Interceptors {
@@ -13,7 +14,7 @@ interface Interceptors {
 }
 
 type Get = <T = any, R = AxiosResponse<T>, D = any>(url: string, params: any, config?: AxiosRequestConfig<D>) => Promise<R>
-export function vAxios(options: Merge<VAxiosConfig, AxiosRequestConfig>): Merge<AxiosInstance, {
+export function vAxios(options?: Merge<VAxiosConfig, AxiosRequestConfig>): Merge<AxiosInstance, {
   get: Get
   post: Get
   put: Get
@@ -44,41 +45,53 @@ export function vAxios(options: Merge<VAxiosConfig, AxiosRequestConfig>): Merge<
   })
 
   const Get = service.get
-  service.get = function (url: string, params?: Record<string, any>, config: AxiosRequestConfig<any> = {}) {
+  service.get = function (url: string, params: Record<string, any> = {}, config: Merge<AxiosRequestConfig<any>, { retry?: number }> = {}) {
     const key = generateKey({ url, method: 'get', params })
-    return Get.call(service, url, {
+    const count = 0
+    const { retry = 0 } = config
+    const call = () => Get.call(service, url, {
       cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
       params,
       ...config,
     })
+    return promiseCall(call, retry, count)
   } as typeof axios.get
 
   const Post = service.post
-  service.post = function (url: string, data?: Record<string, any>, config: AxiosRequestConfig<any> = {}) {
+  service.post = function (url: string, data: Record<string, any> = {}, config: Merge<AxiosRequestConfig<any>, { retry?: number }> = {}) {
     const key = generateKey({ url, method: 'post', data })
-    return Post.call(service, url, data, {
+    const count = 0
+    const { retry = 0 } = config
+    const call = () => Post.call(service, url, data, {
       cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
       ...config,
     })
+    return promiseCall(call, retry, count)
   } as typeof axios.post
 
   const Put = service.put
-  service.put = function (url: string, data?: Record<string, any>, config: AxiosRequestConfig<any> = {}) {
+  service.put = function (url: string, data: Record<string, any> = {}, config: Merge<AxiosRequestConfig<any>, { retry?: number }> = {}) {
     const key = generateKey({ url, method: 'post', data })
-    return Put.call(service, url, data, {
+    const count = 0
+    const { retry = 0 } = config
+    const call = () => Put.call(service, url, data, {
       cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
       ...config,
     })
+    return promiseCall(call, retry, count)
   } as typeof axios.put
 
   const Delete = service.delete
-  service.delete = function (url: string, params?: Record<string, any>, config: AxiosRequestConfig<any> = {}) {
+  service.delete = function (url: string, params: Record<string, any> = {}, config: Merge<AxiosRequestConfig<any>, { retry?: number }> = {}) {
     const key = generateKey({ url, method: 'get', params })
-    return Delete.call(service, url, {
+    const count = 0
+    const { retry = 0 } = config
+    const call = () => Delete.call(service, url, {
       cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
       params,
       ...config,
     })
+    return promiseCall(call, retry, count)
   } as typeof axios.delete
 
   return service
@@ -95,3 +108,18 @@ function generateKey(config: AxiosRequestConfig) {
   return `${url}-${method}-${JSON.stringify(method === 'get' ? params : data)}`
 }
 
+function promiseCall(call: () => Promise<any>, retry: number, count: number) {
+  return new Promise((resolve, reject) => {
+    const p = call()
+    p.then(resolve)
+    p.catch((err) => {
+      if (count < retry) {
+        count++
+        promiseCall(call, retry, count)
+      }
+      else {
+        reject(err)
+      }
+    })
+  })
+}
