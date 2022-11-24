@@ -1,6 +1,6 @@
 {
   "name": "@simon_he/v-axios",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "packageManager": "pnpm@6.32.3",
   "description": "vAxios",
   "author": "Simon He",
