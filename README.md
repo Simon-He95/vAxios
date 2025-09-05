@@ -13,7 +13,6 @@
 - Echarts [@simon_he/s-chart](https://github.com/SimonHe1995/sCharts)
 - numsWheel [@simon_he/nums-wheel](https://github.com/SimonHe1995/numsWheel)
 
-
 ## vAxios
 - 基于axios的封装
 - 重复的请求上一次会被自动取消

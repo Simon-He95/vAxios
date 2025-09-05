@@ -1,6 +1,8 @@
-import axios from 'axios'
-import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, Canceler } from 'axios'
+import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import type { Merge } from './types'
+import axios from 'axios'
+import { stableStringify } from '../utils'
+
 export interface VAxiosConfig {
   interceptors?: Interceptors
   retry?: number
@@ -21,8 +23,7 @@ export function vAxios(options?: Merge<VAxiosConfig, AxiosRequestConfig>): Merge
   delete: Get
 }> {
   const service = axios.create(options)
-  const cancelMap = new Map<string, Canceler>()
-  const CancelToken = axios.CancelToken
+  const cancelMap = new Map<string, AbortController>()
   const {
     request,
     response,
@@ -30,8 +31,12 @@ export function vAxios(options?: Merge<VAxiosConfig, AxiosRequestConfig>): Merge
     responseError,
   } = options?.interceptors || {}
   service.interceptors.request.use((data) => {
-    const key = generateKey(data);
-    (data as any).cancel = cancelMap.get(key)
+    const key = generateKey(data)
+    const controller = cancelMap.get(key)
+    if (controller) {
+      // keep compatibility: attach signal so downstream can read it
+      ;(data as any).signal = controller.signal
+    }
     return request?.(data) || data
   }, requestError)
 
@@ -48,11 +53,15 @@ export function vAxios(options?: Merge<VAxiosConfig, AxiosRequestConfig>): Merge
   service.get = function (url: string, params: Record<string, any> = {}, config: Merge<AxiosRequestConfig<any>, { retry?: number }> = {}) {
     const key = generateKey({ url, method: 'get', params })
     const { retry = 0 } = config
-    const call = () => Get.call(service, url, {
-      cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
-      params,
-      ...config,
-    })
+    const call = () => {
+      const controller = new AbortController()
+      cancelInterceptor(key, controller)
+      return Get.call(service, url, {
+        signal: controller.signal,
+        params,
+        ...config,
+      })
+    }
     return promiseCall(call, retry)
   } as typeof axios.get
 
@@ -60,64 +69,78 @@ export function vAxios(options?: Merge<VAxiosConfig, AxiosRequestConfig>): Merge
   service.post = function (url: string, data: Record<string, any> = {}, config: Merge<AxiosRequestConfig<any>, { retry?: number }> = {}) {
     const key = generateKey({ url, method: 'post', data })
     const { retry = 0 } = config
-    const call = () => Post.call(service, url, data, {
-      cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
-      ...config,
-    })
+    const call = () => {
+      const controller = new AbortController()
+      cancelInterceptor(key, controller)
+      return Post.call(service, url, data, {
+        signal: controller.signal,
+        ...config,
+      })
+    }
     return promiseCall(call, retry)
   } as typeof axios.post
 
   const Put = service.put
   service.put = function (url: string, data: Record<string, any> = {}, config: Merge<AxiosRequestConfig<any>, { retry?: number }> = {}) {
-    const key = generateKey({ url, method: 'post', data })
+    const key = generateKey({ url, method: 'put', data })
     const { retry = 0 } = config
-    const call = () => Put.call(service, url, data, {
-      cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
-      ...config,
-    })
+    const call = () => {
+      const controller = new AbortController()
+      cancelInterceptor(key, controller)
+      return Put.call(service, url, data, {
+        signal: controller.signal,
+        ...config,
+      })
+    }
     return promiseCall(call, retry)
   } as typeof axios.put
 
   const Delete = service.delete
   service.delete = function (url: string, params: Record<string, any> = {}, config: Merge<AxiosRequestConfig<any>, { retry?: number }> = {}) {
-    const key = generateKey({ url, method: 'get', params })
+    const key = generateKey({ url, method: 'delete', params })
     const { retry = 0 } = config
-    const call = () => Delete.call(service, url, {
-      cancelToken: new CancelToken(c => cancelInterceptor(key, c)),
-      params,
-      ...config,
-    })
+    const call = () => {
+      const controller = new AbortController()
+      cancelInterceptor(key, controller)
+      return Delete.call(service, url, {
+        signal: controller.signal,
+        params,
+        ...config,
+      })
+    }
     return promiseCall(call, retry)
   } as typeof axios.delete
 
   return service
 
-  function cancelInterceptor(key: string, c: Canceler) {
-    if (cancelMap.has(key))
-      cancelMap.get(key)?.('取消上一个重复的请求')
+  function cancelInterceptor(key: string, c: AbortController) {
+    if (cancelMap.has(key)) {
+      const prev = cancelMap.get(key)
+      prev?.abort()
+    }
     cancelMap.set(key, c)
   }
 }
 
-function generateKey(config: AxiosRequestConfig) {
-  const { url, method, params, data } = config
-  return `${url}-${method}-${JSON.stringify(method === 'get' ? params : data)}`
+export function generateKey(config: AxiosRequestConfig) {
+  const url = config.url || ''
+  const method = ((config.method || 'get') as string).toLowerCase()
+  const payload = method === 'get' ? (config.params ?? undefined) : (config.data ?? undefined)
+  return `${url}-${method}-${stableStringify(payload)}`
 }
 
-function promiseCall(call: () => Promise<any>, retry: number, count = 0, resolve?: any, reject?: any) {
-  return new Promise((_resolve, _reject) => {
-    resolve = resolve || _resolve
-    reject = reject || _reject
-    const p = call()
-    p.then(resolve)
-    p.catch((err) => {
-      if (count < retry) {
-        count++
-        promiseCall(call, retry, count, resolve, reject)
-      }
-      else {
-        reject(err)
-      }
-    })
-  })
+async function promiseCall(call: () => Promise<any>, retry: number) {
+  let lastErr: any
+  for (let attempt = 0; attempt <= retry; attempt++) {
+    try {
+      return await call()
+    }
+    catch (err) {
+      lastErr = err
+      if (attempt === retry)
+        throw lastErr
+      // small tick before retry to avoid tight loop
+      await new Promise(r => setTimeout(r, 0))
+    }
+  }
 }

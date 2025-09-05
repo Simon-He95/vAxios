@@ -74,4 +74,3 @@ axios.post('/api/get', {
   console.log('finally')
 })
 ```
-
