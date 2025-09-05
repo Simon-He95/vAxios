@@ -1,22 +1,26 @@
 <script setup lang="ts">
-// import { vAxios } from '../../src'
-// const axios = vAxios()
-// axios
-//   .get(
-//     '/api',
-//     {},
-//     {
-//       retry: 2,
-//     },
-//   )
-//   .then((res) => {
-//     console.log(res)
-//   })
+import { vAxios } from '../../src'
+
+const axios = vAxios({
+  baseURL: 'https://httpbin.org',
+  timeout: 1000,
+})
+axios
+  .get(
+    '/api',
+    {},
+    {
+      baseURL: 'http://httpbin.org',
+    },
+  )
+  .then((res) => {
+    console.log(res)
+  })
 </script>
 
 <template>
   <div>
-    <slot />
+    hi
   </div>
 </template>
 

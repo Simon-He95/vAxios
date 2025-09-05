@@ -1,21 +1,8 @@
-import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
-import type { Merge } from './types'
+import type { AxiosInstance, AxiosRequestConfig } from 'axios'
+import type { Get, Merge, VAxiosConfig } from './types'
 import axios from 'axios'
 import { stableStringify } from '../utils'
 
-export interface VAxiosConfig {
-  interceptors?: Interceptors
-  retry?: number
-}
-
-interface Interceptors {
-  request?: (data: any) => any
-  requestError?: (error: any) => Promise<any>
-  response?: (data: any) => any
-  responseError?: (error: any) => Promise<any>
-}
-
-type Get = <T = any, R = AxiosResponse<T>, D = any>(url: string, params: any, config?: AxiosRequestConfig<D>) => Promise<R>
 export function vAxios(options?: Merge<VAxiosConfig, AxiosRequestConfig>): Merge<AxiosInstance, {
   get: Get
   post: Get
